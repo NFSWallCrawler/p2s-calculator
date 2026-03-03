@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdzForge Dashboard</title>
+<style>
+body { font-family: Arial; padding:20px; background:#f4f4f4; }
+.container { max-width:480px; margin:auto; background:white; padding:20px; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1);}
+h2 { text-align:center; margin-bottom:5px; }
+.logo { text-align:center; border:2px dashed #ccc; padding:15px; margin-bottom:10px; }
+input, select, textarea { width:100%; padding:8px; margin:6px 0; border-radius:8px; border:1px solid #ccc;}
+button { width:100%; padding:10px; margin-top:6px; border-radius:8px; border:none; background:#2c7be5; color:white; font-size:15px;}
+.result { margin-top:15px; padding:12px; background:#eef6ff; border-radius:8px;}
+.section { margin-top:20px; padding-top:10px; border-top:1px solid #ddd;}
+.hidden { display:none; }
+.progress { background:#ddd; border-radius:8px; overflow:hidden; height:20px;}
+.progress-bar { height:100%; background:#2c7be5; width:0%; text-align:center; color:white; font-size:12px;}
+.quoteBox { background:white; padding:15px; border:1px solid #ccc; margin-top:15px;}
+.small { font-size:12px; color:#666;}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+<h2>AdzForge</h2>
+<div class="logo">LOGO PLACEHOLDER</div>
+
+<label>Mode</label>
+<select id="modeToggle" onchange="toggleMode()">
+<option value="basic">Basic Calculator</option>
+<option value="client">Client Quote Mode</option>
+</select>
+
+<!-- BASIC INPUTS -->
+<label>Print Time (hrs)</label>
+<input type="number" id="time" step="0.1">
+
+<label>Print Weight (g)</label>
+<input type="number" id="weight">
+
+<label>Colors (1–4)</label>
+<input type="number" id="colors" min="1" max="4">
+
+<label>Profit Margin (%)</label>
+<input type="number" id="margin">
+
+<button onclick="calculate()">Calculate</button>
+
+<div class="result">
+<p><strong>Production:</strong> ₱<span id="cost">0.00</span></p>
+<p><strong>Selling:</strong> ₱<span id="price">0.00</span></p>
+<p><strong>Profit:</strong> ₱<span id="profit">0.00</span></p>
+</div>
+
+<!-- CLIENT SECTION -->
+<div id="clientSection" class="hidden section">
+<h3>Client Information</h3>
+<input type="text" id="clientName" placeholder="Client Name">
+<textarea id="projectDesc" placeholder="Project Description"></textarea>
+<input type="date" id="dueDate">
+<label><input type="checkbox" id="rush"> Rush Order (+20%)</label>
+
+<button onclick="generateQuote()">Generate Quote</button>
+
+<div id="quoteOutput" class="quoteBox hidden"></div>
+<button onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<!-- BUSINESS TRACKING -->
+<div class="section">
+<h3>Break-Even</h3>
+<p>Recovered: ₱<span id="recovered">0</span></p>
+<div class="progress"><div class="progress-bar" id="progressBar">0%</div></div>
+<button onclick="addProfit()">Add Profit</button>
+</div>
+
+<div class="section">
+<h3>Inventory</h3>
+<label>Filament Stock (grams)</label>
+<input type="number" id="filamentStock" value="1000">
+<button onclick="deductFilament()">Deduct Last Print</button>
+</div>
+
+<div class="section">
+<h3>Revenue</h3>
+<p>Monthly Revenue: ₱<span id="monthlyRevenue">0</span></p>
+<button onclick="addRevenue()">Add Sale</button>
+<button onclick="resetMonth()">Reset</button>
+</div>
+
+</div>
+
+<script>
+let machineCost = 60000;
+let hoursPerYear = 1500;
+let powerKW = 0.35;
+let electricRate = 12;
+let filamentPrice = 900;
+
+let recoveredAmount = localStorage.getItem("recovered") ? parseFloat(localStorage.getItem("recovered")) : 0;
+let monthlyRevenue = localStorage.getItem("monthlyRevenue") ? parseFloat(localStorage.getItem("monthlyRevenue")) : 0;
+
+function toggleMode(){
+clientSection.classList.toggle("hidden", modeToggle.value==="basic");
+}
+
+function calculate(){
+let timeVal = parseFloat(time.value)||0;
+let weightVal = parseFloat(weight.value)||0;
+let colorsVal = parseFloat(colors.value)||0;
+let marginVal = parseFloat(margin.value)||0;
+
+let depreciation = machineCost / (2 * hoursPerYear);
+let electricity = timeVal * powerKW * electricRate;
+let material = weightVal * (filamentPrice/1000);
+let colorCost = colorsVal * 10;
+
+let production = (timeVal * depreciation) + electricity + material + colorCost;
+let selling = production * (1 + marginVal/100);
+let profitVal = selling - production;
+
+cost.innerText = production.toFixed(2);
+price.innerText = selling.toFixed(2);
+profit.innerText = profitVal.toFixed(2);
+
+updateBreakEven();
+}
+
+function generateQuote(){
+let rushMultiplier = rush.checked ? 1.2 : 1;
+let finalPrice = parseFloat(price.innerText) * rushMultiplier;
+let quoteID = "ADZF-" + Date.now().toString().slice(-6);
+
+quoteOutput.classList.remove("hidden");
+quoteOutput.innerHTML = `
+<h3>AdzForge Quotation</h3>
+<p><strong>Quote ID:</strong> ${quoteID}</p>
+<p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+<p><strong>Client:</strong> ${clientName.value}</p>
+<p><strong>Description:</strong> ${projectDesc.value}</p>
+<p><strong>Due:</strong> ${dueDate.value}</p>
+<hr>
+<p><strong>Final Price:</strong> ₱${finalPrice.toFixed(2)}</p>
+<p class="small">Valid for 7 days.</p>
+`;
+}
+
+function updateBreakEven(){
+recovered.innerText = recoveredAmount.toFixed(0);
+let percent = (recoveredAmount/machineCost)*100;
+progressBar.style.width = percent + "%";
+progressBar.innerText = percent.toFixed(0)+"%";
+}
+
+function addProfit(){
+recoveredAmount += parseFloat(profit.innerText)||0;
+localStorage.setItem("recovered", recoveredAmount);
+updateBreakEven();
+}
+
+function deductFilament(){
+let stock = parseFloat(filamentStock.value)||0;
+let used = parseFloat(weight.value)||0;
+filamentStock.value = stock - used;
+}
+
+function addRevenue(){
+monthlyRevenue += parseFloat(price.innerText)||0;
+localStorage.setItem("monthlyRevenue", monthlyRevenue);
+monthlyRevenueDisplay();
+}
+
+function monthlyRevenueDisplay(){
+monthlyRevenue.innerText = monthlyRevenue.toFixed(0);
+}
+
+function resetMonth(){
+monthlyRevenue=0;
+localStorage.setItem("monthlyRevenue",0);
+monthlyRevenueDisplay();
+}
+
+updateBreakEven();
+monthlyRevenueDisplay();
+</script>
+
+</body>
+</html>
